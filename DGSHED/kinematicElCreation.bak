@@ -1,0 +1,34 @@
+
+int NumKinEls;
+int NumKinNodes;
+int *DownstreamNodes;
+struct coords* kinematicNodes;
+void create_kinematic_nodes()
+{
+	kinematicNodes = NULL;
+	DownstreamNodes = (int*) xcalloc(2*NumEl, sizeof(int));
+	NumKinNodes = 0;
+	NumKinEls = 0;
+	for (int  i = 0; i < NumEl; ++i)
+	{
+		int numFlowEdges = NumFlowEdges[i];
+		for (int j = 0; j < numFlowEdges; j++)
+		{
+			int flowEdg = FlowEdg[i*2+j];
+			double n1 = EdgtoVert[flowEdg*2];
+			double n2 = EdgtoVert[flowEdg*2+1];
+			double xval = 0.5*(x_coord[n1] + x_coord[n2]);
+			double yval = 0.5*(y_coord[n1] + y_coord[n2]);
+			double zval = 0.5*(z[n1] + z[n2]);
+			double nfval = 0.5*(nFriction[n1]+nFriction[n2]);
+			int nodeNum = add_to_coords(KinematicNodes, xval, yval, zval, nfval, &NumKinNodes);
+			DownstreamNodes[i*2+j] = nodeNum;
+			NumKinEls++;
+		}
+	}	
+}
+
+void create_kinematic_elements()
+{
+	KinematicElList = (struct kinematicEl**) xcalloc(NumEl, sizeof(struct kinematicEl*));
+}

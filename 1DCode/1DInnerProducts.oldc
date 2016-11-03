@@ -1,0 +1,111 @@
+#include <stdio.h>
+#include <math.h>
+#include "mathfunctions.h"
+#include "globals.h"
+
+/*********** Compute the Inner products we are interested in *****************/
+/*****************************************************************************/
+extern const double g;
+extern double getI1(double A, double b, double m1, double m2);
+extern double getI2(double A, double b, double db, double m1, double dm1, double m2, double dm2);
+extern double getS_f(double A, double Q, double b, double n);
+
+void Compute_InnerProducts(double IP1[], double IP2[], double IP3[], double IP4[], double IP5[], double IP6[], double IP7[], double IP8[], double IP9[], double IP10[])
+{
+
+	// Gauss nodes for a 2-point Gauss quadrature rule
+	double t[] = {-0.577350269189626,  0.577350269189626};
+	//Jacobian of the transformation 
+	double jac[NumEl];
+
+	for (int i = 0; i<NumEl; ++i)
+	{
+		jac[i] = dh[i]/2;
+	}
+
+	// Get the value of the basis functions and the derivatives of the basis functions at the Gauss points for all elements.
+	int sizeoft =  sizeof(t)/sizeof(t[0]);
+	double psi1[sizeoft], psi2[sizeoft], dpsi1[NumEl], dpsi2[NumEl];
+	for (int i =0; i < sizeoft; ++i){
+		psi1[i] = (1 - t[i])/2;
+		psi2[i] = (1 + t[i])/2;
+	}
+
+	// Gradient along the direction of the channel
+	for (int i=0; i < NumEl; ++i)
+	{
+		dpsi1[i] = -1./(2*jac[i]);
+		dpsi2[i] = 1/(2*jac[i]);
+	}
+
+	double A1[NumEl], A2[NumEl];
+	double Q1[NumEl], Q2[NumEl];
+	double b_t1[NumEl], b_t2[NumEl];
+	double I1_1[NumEl], I1_2[NumEl];
+	double I2_1[NumEl], I2_2[NumEl];
+	double S_0[NumEl];
+	double S_f1[NumEl], S_f2[NumEl];
+	
+	// Get the value of Area and Discharge at the Gauss nodes for all elements
+	// Also get the breadth and its derivatives at the Gauss points for all elements
+	for (int i = 0; i < NumEl; ++i){
+		int j = 2*i+1;
+		// Linear interpolation of the A values at the nodes
+		A1[i] = psi1[0]*A[j] + psi2[0]*A[j+1];	
+		A2[i] = psi1[1]*A[j] + psi2[1]*A[j+1];
+
+		// Linear interpolation of the Q values at the nodes
+		Q1[i] = psi1[0]*Q[j] + psi2[0]*Q[j+1];
+		Q2[i] = psi1[1]*Q[j] + psi2[1]*Q[j+1];
+		
+		// Linear interpolatio of the breadth values at the nodes
+		b_t1[i] = psi1[0]*b[i] + psi2[0]*b[i+1];
+		b_t2[i] = psi1[1]*b[i] + psi2[1]*b[i+1];
+		
+		// value of I1 at the Gauss points
+		I1_1[i] = getI1(A1[i], b_t1[i]);
+		I1_2[i] = getI1(A2[i], b_t2[i]);
+
+		// value of S_f at the Gauss points
+		S_f1[i] = getS_f(A1[i], Q1[i], b_t1[i], nFriction);
+		S_f2[i] = getS_f(A2[i], Q2[i], b_t2[i], nFriction);
+
+		// S_0 will be piecewise constant over the element
+		S_0[i] = dz[i];
+	
+		I2_1[i] = getI2(A1[i], b_t1[i],db[i]);
+		I2_2[i] = getI2(A2[i], b_t2[i],db[i]);
+			
+	}
+
+	// Compute the inner products we are interested in 
+
+	for (int i = 0; i < NumEl; ++i)
+	{
+		double localG;
+		#ifdef WDON
+		if (WD[i]==1)
+			localG = g;
+		else
+			localG = 0;
+		#else
+			localG = g;
+		#endif
+
+
+		IP1[i] = jac[i]*dpsi1[i]*(Q1[i]+Q2[i]);
+		IP2[i] = jac[i]*dpsi2[i]*(Q1[i]+Q2[i]);
+
+		IP3[i] = jac[i]*dpsi1[i]*(Q1[i]*Q1[i]/A1[i]+localG*I1_1[i] + Q2[i]*Q2[i]/A2[i] + localG*I1_2[i]);
+		IP4[i] = localG*jac[i]*(psi1[0]*I2_1[i] + psi1[1]*I2_2[i]);
+		IP5[i] = localG*jac[i]*S_0[i]*(psi1[0]*A1[i]+psi1[1]*A2[i]);
+		IP6[i] = localG*jac[i]*(psi1[0]*A1[i]*S_f1[i] + psi1[1]*A2[i]*S_f2[i]);		
+
+		IP7[i] = jac[i]*dpsi2[i]*(Q1[i]*Q1[i]/A1[i]+localG*I1_1[i] + Q2[i]*Q2[i]/A2[i] + localG*I1_2[i]);
+		IP8[i] = localG*jac[i]*(psi2[0]*I2_1[i] + psi2[1]*I2_2[i]);
+		IP9[i] = localG*jac[i]*S_0[i]*(psi2[0]*A1[i]+psi2[1]*A2[i]);
+		IP10[i] = localG*jac[i]*(psi2[0]*A1[i]*S_f1[i] + psi2[1]*A2[i]*S_f2[i]);		
+
+	}
+}
+
